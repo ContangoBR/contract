@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  RUST_VERSION: 1.87.0
+  SOROBAN_CLI_VERSION: 22.8.1
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  test-and-build:
+    name: Test and Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Rust toolchain
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.rustup/toolchains
+            ~/.rustup/update-hashes
+            ~/.rustup/settings.toml
+          key: ${{ runner.os }}-rust-toolchain-${{ env.RUST_VERSION }}
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          profile: minimal
+          override: true
+          target: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Soroban CLI
+        id: cache-soroban
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin/soroban
+          key: ${{ runner.os }}-soroban-cli-${{ env.SOROBAN_CLI_VERSION }}
+
+      - name: Install Soroban CLI
+        if: steps.cache-soroban.outputs.cache-hit != 'true'
+        run: |
+          echo "Installing Soroban CLI version ${{ env.SOROBAN_CLI_VERSION }}"
+          cargo install --locked soroban-cli --version ${{ env.SOROBAN_CLI_VERSION }}
+
+      - name: Verify Soroban CLI
+        run: soroban --version
+
+      - name: Cache build artifacts
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-build-${{ env.RUST_VERSION }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/*.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.RUST_VERSION }}-${{ hashFiles('**/Cargo.lock') }}-
+            ${{ runner.os }}-build-${{ env.RUST_VERSION }}-
+
+      - name: Run checks
+        run: |
+          echo "::group::Formatting check"
+          cargo fmt --all -- --check
+          echo "::endgroup::"
+
+          echo "::group::Clippy check"
+          cargo clippy --all-targets --all-features -- -D warnings
+          echo "::endgroup::"
+
+          echo "::group::Run tests"
+          cargo test --verbose
+          echo "::endgroup::"
+
+      - name: Build contract
+        run: |
+          if [ -f "Makefile" ] && grep -q "^build:" Makefile; then
+            echo "Using Makefile build"
+            make build
+          else
+            echo "Using cargo build"
+            cargo build --target wasm32-unknown-unknown --release
+          fi
+
+      - name: Optimize WASM
+        run: |
+          # Find the built WASM file
+          WASM_FILE=$(find target -name "*.wasm" -type f | grep -E "(wasm32-unknown-unknown|wasm32v1-none)/release" | grep -v ".optimized.wasm" | head -1)
+
+          if [ -n "$WASM_FILE" ]; then
+            echo "Optimizing: $WASM_FILE"
+            soroban contract optimize --wasm "$WASM_FILE"
+
+            # Show size comparison
+            ORIGINAL_SIZE=$(stat -c%s "$WASM_FILE" 2>/dev/null || stat -f%z "$WASM_FILE" 2>/dev/null)
+            OPTIMIZED_FILE="${WASM_FILE%.wasm}.optimized.wasm"
+            if [ -f "$OPTIMIZED_FILE" ]; then
+              OPTIMIZED_SIZE=$(stat -c%s "$OPTIMIZED_FILE" 2>/dev/null || stat -f%z "$OPTIMIZED_FILE" 2>/dev/null)
+              echo "Original size: $ORIGINAL_SIZE bytes"
+              echo "Optimized size: $OPTIMIZED_SIZE bytes"
+              echo "Size reduction: $((ORIGINAL_SIZE - OPTIMIZED_SIZE)) bytes ($((100 * (ORIGINAL_SIZE - OPTIMIZED_SIZE) / ORIGINAL_SIZE))%)"
+            fi
+          else
+            echo "No WASM file found to optimize"
+            exit 1
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: optimized-contract-${{ github.sha }}
+          path: |
+            target/**/*.optimized.wasm
+          retention-days: 30
+
+  # Separate job for security audit to run in parallel
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache cargo audit
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit
+
+      - name: Run cargo audit
+        uses: actions-rs/audit-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
