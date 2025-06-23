@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Cache Rust toolchain
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.rustup/toolchains
@@ -31,16 +31,19 @@ jobs:
           key: ${{ runner.os }}-rust-toolchain-${{ env.RUST_VERSION }}
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          profile: minimal
-          override: true
-          target: wasm32-unknown-unknown
+          targets: wasm32-unknown-unknown
           components: rustfmt, clippy
 
+      - name: Add wasm32v1-none target
+        run: |
+          rustup target add wasm32v1-none
+
+      # Cache cargo registry separately from build artifacts
       - name: Cache Cargo registry
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry/index/
@@ -50,9 +53,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
+      # Cache Soroban CLI binary
       - name: Cache Soroban CLI
         id: cache-soroban
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/soroban
           key: ${{ runner.os }}-soroban-cli-${{ env.SOROBAN_CLI_VERSION }}
@@ -66,8 +70,9 @@ jobs:
       - name: Verify Soroban CLI
         run: soroban --version
 
+      # Cache build artifacts separately
       - name: Cache build artifacts
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: target
           key: ${{ runner.os }}-build-${{ env.RUST_VERSION }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/*.rs') }}
@@ -75,16 +80,17 @@ jobs:
             ${{ runner.os }}-build-${{ env.RUST_VERSION }}-${{ hashFiles('**/Cargo.lock') }}-
             ${{ runner.os }}-build-${{ env.RUST_VERSION }}-
 
+      # Run all checks in parallel
       - name: Run checks
         run: |
           echo "::group::Formatting check"
           cargo fmt --all -- --check
           echo "::endgroup::"
-
+          
           echo "::group::Clippy check"
           cargo clippy --all-targets --all-features -- -D warnings
           echo "::endgroup::"
-
+          
           echo "::group::Run tests"
           cargo test --verbose
           echo "::endgroup::"
@@ -103,11 +109,11 @@ jobs:
         run: |
           # Find the built WASM file
           WASM_FILE=$(find target -name "*.wasm" -type f | grep -E "(wasm32-unknown-unknown|wasm32v1-none)/release" | grep -v ".optimized.wasm" | head -1)
-
+          
           if [ -n "$WASM_FILE" ]; then
             echo "Optimizing: $WASM_FILE"
             soroban contract optimize --wasm "$WASM_FILE"
-
+          
             # Show size comparison
             ORIGINAL_SIZE=$(stat -c%s "$WASM_FILE" 2>/dev/null || stat -f%z "$WASM_FILE" 2>/dev/null)
             OPTIMIZED_FILE="${WASM_FILE%.wasm}.optimized.wasm"
@@ -123,7 +129,7 @@ jobs:
           fi
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           name: optimized-contract-${{ github.sha }}
@@ -140,12 +146,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Cache cargo audit
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-audit
           key: ${{ runner.os }}-cargo-audit
 
       - name: Run cargo audit
-        uses: actions-rs/audit-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          command -v cargo-audit || cargo install cargo-audit
+          cargo audit
