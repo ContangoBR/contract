@@ -1,5 +1,5 @@
 use crate::balance::{read_balance, receive_balance, spend_balance};
-use crate::config::{read_config, Config};
+use crate::config::{Config, read_config};
 use soroban_sdk::{Address, Env};
 
 pub struct FeeCalculation {

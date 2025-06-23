@@ -1,16 +1,16 @@
 use crate::admin::{read_administrator, write_administrator};
 use crate::allowance::{read_allowance, spend_allowance, write_allowance};
 use crate::balance::{read_balance, receive_balance};
-use crate::config::{read_config, write_config, Config};
+use crate::config::{Config, read_config, write_config};
 use crate::fees::{process_fees_and_burn, process_fees_and_transfer};
 use crate::metadata::{read_decimal, read_name, read_symbol, write_metadata};
 use crate::storage_types::{
     AllowanceDataKey, AllowanceValue, DataKey, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD,
 };
 use soroban_sdk::token::{self, Interface as _};
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use soroban_token_sdk::metadata::TokenMetadata;
+use soroban_sdk::{Address, Env, String, contract, contractimpl};
 use soroban_token_sdk::TokenUtils;
+use soroban_token_sdk::metadata::TokenMetadata;
 
 fn check_nonnegative_amount(amount: i128) {
     if amount < 0 {

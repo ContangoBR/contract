@@ -1,5 +1,5 @@
 use crate::storage_types::DataKey;
-use soroban_sdk::{contracttype, Address, Env, String};
+use soroban_sdk::{Address, Env, String, contracttype};
 
 #[derive(Clone, Debug)]
 #[contracttype]

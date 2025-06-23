@@ -1,11 +1,10 @@
 #[cfg(test)]
 extern crate std;
 
-use crate::{config::Config, contract::Token, TokenClient};
+use crate::{TokenClient, config::Config, contract::Token};
 use soroban_sdk::{
-    symbol_short,
+    Address, Env, FromVal, IntoVal, String, Symbol, symbol_short,
     testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation},
-    Address, Env, FromVal, IntoVal, String, Symbol,
 };
 
 fn create_token<'a>(e: &Env, admin: &Address) -> TokenClient<'a> {

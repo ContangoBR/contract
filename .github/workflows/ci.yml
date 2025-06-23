@@ -34,7 +34,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          targets: wasm32-unknown-unknown
+          targets: wasm32v1-none
           components: rustfmt, clippy
 
       - name: Add wasm32v1-none target
@@ -65,7 +65,7 @@ jobs:
         if: steps.cache-soroban.outputs.cache-hit != 'true'
         run: |
           echo "Installing Soroban CLI version ${{ env.SOROBAN_CLI_VERSION }}"
-          cargo install --locked soroban-cli --version ${{ env.SOROBAN_CLI_VERSION }}
+          cargo install --locked soroban-cli --version ${{ env.SOROBAN_CLI_VERSION }} --features opt
 
       - name: Verify Soroban CLI
         run: soroban --version
@@ -97,13 +97,8 @@ jobs:
 
       - name: Build contract
         run: |
-          if [ -f "Makefile" ] && grep -q "^build:" Makefile; then
-            echo "Using Makefile build"
-            make build
-          else
             echo "Using cargo build"
-            cargo build --target wasm32-unknown-unknown --release
-          fi
+            cargo build --target wasm32v1-none --release
 
       - name: Optimize WASM
         run: |
