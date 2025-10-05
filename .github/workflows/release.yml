@@ -17,6 +17,6 @@ jobs:
       release_name: ${{ github.ref_name }}          # use git tag as unique release name
       release_description: 'Contango Token Contract Release'
       package: 'contango-token-contract'            # package name from Cargo.toml
-      make_target: 'build'                          # make target to invoke (defined in Makefile)
+      # Don't specify make_target - let it use cargo build directly
     secrets:
       release_token: ${{ secrets.GITHUB_TOKEN }}    # authentication token automatically created by GitHub
