@@ -31,7 +31,6 @@ pub struct TokenState {
 #[derive(Clone)]
 pub struct Distribution {
     pub producer_address: Address,
-    pub platform_address: Address,
     pub storage_address: Address,
     pub producer_percent: u32, // e.g., 9900 = 99%
     pub platform_percent: u32, // e.g., 50 = 0.5%
@@ -59,7 +58,6 @@ impl ContangoToken {
         name: String,
         symbol: String,
         admin: Address,
-        platform_address: Address,
         storage_address: Address,
     ) {
         if env.storage().instance().has(&DataKey::Config) {
@@ -69,9 +67,8 @@ impl ContangoToken {
         let config = Config {
             name,
             symbol,
-            platform_address: platform_address.clone(),
-            storage_address: storage_address.clone(),
             admin: admin.clone(),
+            storage_address: storage_address.clone(),
             transfer_fee_percent: 0,  // No fee on transfers by default
             burn_fee_percent: 50,     // 0.5% burn fee
             platform_fee_percent: 50, // 0.5% platform fee
@@ -124,7 +121,7 @@ impl ContangoToken {
 
         // Update balances atomically
         Self::increase_balance(&env, &distribution.producer_address, producer_amount);
-        Self::increase_balance(&env, &distribution.platform_address, platform_amount);
+        Self::increase_balance(&env, &config.admin, platform_amount);
         Self::increase_balance(&env, &distribution.storage_address, storage_amount);
 
         // Update total supply
@@ -174,7 +171,7 @@ impl ContangoToken {
 
         // For future contracts, buyer tokens are locked until delivery
         Self::increase_locked_balance(&env, &buyer, buyer_amount);
-        Self::increase_balance(&env, &config.platform_address, platform_amount);
+        Self::increase_balance(&env, &config.admin, platform_amount);
         Self::increase_balance(&env, &guarantee_agent, guarantee_amount);
 
         // Update total supply
@@ -246,7 +243,7 @@ impl ContangoToken {
 
         // Execute burn
         Self::decrease_balance(&env, &from, amount);
-        Self::increase_balance(&env, &config.platform_address, platform_fee);
+        Self::increase_balance(&env, &config.admin, platform_fee);
         Self::increase_balance(&env, &config.storage_address, storage_fee);
 
         // Update total supply
@@ -277,7 +274,7 @@ impl ContangoToken {
             // Transfer fee to platform
             Self::decrease_balance(&env, &from, amount);
             Self::increase_balance(&env, &to, transfer_amount);
-            Self::increase_balance(&env, &config.platform_address, fee);
+            Self::increase_balance(&env, &config.admin, fee);
         } else {
             // No fee transfer
             transfer_amount = amount;
@@ -450,14 +447,12 @@ mod tests {
         let client = ContangoTokenClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
-        let platform = Address::generate(&env);
         let storage = Address::generate(&env);
 
         client.initialize(
             &String::from_str(&env, "Contango Token"),
             &String::from_str(&env, "CTG"),
             &admin,
-            &platform,
             &storage,
         );
 
@@ -473,7 +468,6 @@ mod tests {
         let client = ContangoTokenClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
-        let platform = Address::generate(&env);
         let storage = Address::generate(&env);
         let producer = Address::generate(&env);
 
@@ -481,7 +475,6 @@ mod tests {
             &String::from_str(&env, "Contango Token"),
             &String::from_str(&env, "CTG"),
             &admin,
-            &platform,
             &storage,
         );
 
@@ -502,7 +495,6 @@ mod tests {
 
         let distribution = Distribution {
             producer_address: producer.clone(),
-            platform_address: platform.clone(),
             storage_address: storage.clone(),
             producer_percent: 9900, // 99%
             platform_percent: 50,   // 0.5%
@@ -519,7 +511,7 @@ mod tests {
         );
 
         assert_eq!(client.balance_of(&producer), 990000); // 99%
-        assert_eq!(client.balance_of(&platform), 5000); // 0.5%
+        assert_eq!(client.balance_of(&admin), 5000); // 0.5%
         assert_eq!(client.balance_of(&storage), 5000); // 0.5%
         assert_eq!(client.total_supply(), 1000000);
     }
@@ -531,7 +523,6 @@ mod tests {
         let client = ContangoTokenClient::new(&env, &contract_id);
 
         let admin = Address::generate(&env);
-        let platform = Address::generate(&env);
         let storage = Address::generate(&env);
         let producer = Address::generate(&env);
         let buyer = Address::generate(&env);
@@ -541,7 +532,6 @@ mod tests {
             &String::from_str(&env, "Contango Token"),
             &String::from_str(&env, "CTG"),
             &admin,
-            &platform,
             &storage,
         );
 
@@ -572,7 +562,7 @@ mod tests {
 
         assert_eq!(client.locked_balance_of(&buyer), 495000); // 99% locked
         assert_eq!(client.balance_of(&buyer), 0); // Not available yet
-        assert_eq!(client.balance_of(&platform), 2500); // 0.5%
+        assert_eq!(client.balance_of(&admin), 2500); // 0.5%
         assert_eq!(client.balance_of(&guarantee_agent), 2500); // 0.5%
 
         client.confirm_delivery(&String::from_str(&env, "CTGSoy-USD-2025Q4"), &storage);

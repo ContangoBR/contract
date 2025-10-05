@@ -11,7 +11,6 @@ mod comprehensive_tests {
 
         let addresses = TestAddresses {
             admin: Address::generate(&env),
-            platform: Address::generate(&env),
             storage: Address::generate(&env),
             producer: Address::generate(&env),
             buyer: Address::generate(&env),
@@ -23,7 +22,6 @@ mod comprehensive_tests {
             &String::from_str(&env, "Contango Token"),
             &String::from_str(&env, "CTG"),
             &addresses.admin,
-            &addresses.platform,
             &addresses.storage,
         );
 
@@ -32,7 +30,6 @@ mod comprehensive_tests {
 
     struct TestAddresses {
         admin: Address,
-        platform: Address,
         storage: Address,
         producer: Address,
         buyer: Address,
@@ -48,7 +45,6 @@ mod comprehensive_tests {
         assert_eq!(config.name, String::from_str(&env, "Contango Token"));
         assert_eq!(config.symbol, String::from_str(&env, "CTG"));
         assert_eq!(config.admin, addresses.admin);
-        assert_eq!(config.platform_address, addresses.platform);
         assert_eq!(config.storage_address, addresses.storage);
         assert_eq!(config.transfer_fee_percent, 0);
         assert_eq!(config.burn_fee_percent, 50);
@@ -66,7 +62,6 @@ mod comprehensive_tests {
             &String::from_str(&env, "Another Token"),
             &String::from_str(&env, "ATK"),
             &addresses.admin,
-            &addresses.platform,
             &addresses.storage,
         );
     }
@@ -80,7 +75,6 @@ mod comprehensive_tests {
         let metadata = create_spot_metadata(&env, &addresses.producer);
         let distribution = Distribution {
             producer_address: addresses.producer.clone(),
-            platform_address: addresses.platform.clone(),
             storage_address: addresses.storage.clone(),
             producer_percent: 9900, // 99%
             platform_percent: 50,   // 0.5%
@@ -96,7 +90,7 @@ mod comprehensive_tests {
 
         // Verify exact distributions
         assert_eq!(client.balance_of(&addresses.producer), 990_000);
-        assert_eq!(client.balance_of(&addresses.platform), 5_000);
+        assert_eq!(client.balance_of(&addresses.admin), 5_000);
         assert_eq!(client.balance_of(&addresses.storage), 5_000);
         assert_eq!(client.total_supply(), 1_000_000);
     }
@@ -111,7 +105,6 @@ mod comprehensive_tests {
         let metadata = create_spot_metadata(&env, &addresses.producer);
         let distribution = Distribution {
             producer_address: addresses.producer.clone(),
-            platform_address: addresses.platform.clone(),
             storage_address: addresses.storage.clone(),
             producer_percent: 9800, // 98% - doesn't sum to 100%
             platform_percent: 50,
@@ -146,7 +139,7 @@ mod comprehensive_tests {
         // Verify locked tokens
         assert_eq!(client.locked_balance_of(&addresses.buyer), 495_000); // 99%
         assert_eq!(client.balance_of(&addresses.buyer), 0);
-        assert_eq!(client.balance_of(&addresses.platform), 2_500); // 0.5%
+        assert_eq!(client.balance_of(&addresses.admin), 2_500); // 0.5%
         assert_eq!(client.balance_of(&addresses.guarantee_agent), 2_500); // 0.5%
 
         // Step 2: Confirm delivery
@@ -207,7 +200,7 @@ mod comprehensive_tests {
             initial_balance - 100_000
         );
         assert_eq!(client.balance_of(&addresses.third_party), 100_000);
-        assert_eq!(client.balance_of(&addresses.platform), 5_000); // Unchanged
+        assert_eq!(client.balance_of(&addresses.admin), 5_000); // Unchanged
     }
 
     // Test 8: Transfer with fees
@@ -222,7 +215,7 @@ mod comprehensive_tests {
         // Setup initial balance
         mint_spot_tokens(&env, &client, &addresses, 1_000_000);
 
-        let initial_platform = client.balance_of(&addresses.platform);
+        let initial_admin = client.balance_of(&addresses.admin);
 
         // Transfer with fee
         client.transfer(
@@ -235,8 +228,8 @@ mod comprehensive_tests {
         assert_eq!(client.balance_of(&addresses.producer), 890_000); // 990k - 100k
         assert_eq!(client.balance_of(&addresses.third_party), 99_000); // 100k - 1%
         assert_eq!(
-            client.balance_of(&addresses.platform),
-            initial_platform + 1_000
+            client.balance_of(&addresses.admin),
+            initial_admin + 1_000
         ); // Fee collected
     }
 
@@ -249,7 +242,7 @@ mod comprehensive_tests {
         mint_spot_tokens(&env, &client, &addresses, 1_000_000);
 
         let initial_supply = client.total_supply();
-        let initial_platform = client.balance_of(&addresses.platform);
+        let initial_admin = client.balance_of(&addresses.admin);
         let initial_storage = client.balance_of(&addresses.storage);
 
         // Burn 100k tokens
@@ -262,8 +255,8 @@ mod comprehensive_tests {
         // Verify burn fee distribution (0.5% = 500 tokens)
         assert_eq!(client.balance_of(&addresses.producer), 890_000); // 990k - 100k
         assert_eq!(
-            client.balance_of(&addresses.platform),
-            initial_platform + 250
+            client.balance_of(&addresses.admin),
+            initial_admin + 250
         ); // Half of fee
         assert_eq!(client.balance_of(&addresses.storage), initial_storage + 250); // Half of fee
         assert_eq!(client.total_supply(), initial_supply - 99_500); // Burned amount minus fees
@@ -403,7 +396,6 @@ mod comprehensive_tests {
     fn create_standard_distribution(addresses: &TestAddresses) -> Distribution {
         Distribution {
             producer_address: addresses.producer.clone(),
-            platform_address: addresses.platform.clone(),
             storage_address: addresses.storage.clone(),
             producer_percent: 9900, // 99%
             platform_percent: 50,   // 0.5%
@@ -452,7 +444,7 @@ mod comprehensive_tests {
         assert_eq!(client.balance_of(&addresses.buyer), 150_000);
 
         // Step 4: Verify fee accumulation
-        assert_eq!(client.balance_of(&addresses.platform), 5_000 + 125); // Initial + burn fee
+        assert_eq!(client.balance_of(&addresses.admin), 5_000 + 125); // Initial + burn fee
         assert_eq!(client.balance_of(&addresses.storage), 5_000 + 125); // Initial + burn fee
 
         // Step 5: Verify total supply reduced
@@ -600,7 +592,7 @@ mod comprehensive_tests {
 
         // Verify combined balance
         assert_eq!(client.balance_of(&addresses.producer), 990_000); // 495k + 495k
-        assert_eq!(client.balance_of(&addresses.platform), 5_000); // 2.5k + 2.5k
+        assert_eq!(client.balance_of(&addresses.admin), 5_000); // 2.5k + 2.5k
         assert_eq!(client.balance_of(&addresses.storage), 5_000); // 2.5k + 2.5k
         assert_eq!(client.total_supply(), 1_000_000);
 
@@ -617,7 +609,7 @@ mod comprehensive_tests {
         // Final balance check
         assert_eq!(client.balance_of(&addresses.producer), 890_000);
         assert_eq!(client.balance_of(&addresses.buyer), 50_000);
-        assert_eq!(client.balance_of(&addresses.platform), 5_125); // +125 from burn fee
+        assert_eq!(client.balance_of(&addresses.admin), 5_125); // +125 from burn fee
         assert_eq!(client.balance_of(&addresses.storage), 5_125); // +125 from burn fee
         assert_eq!(client.total_supply(), 950_250); // 1M - 50k + 250 fees
     }
@@ -640,7 +632,7 @@ mod comprehensive_tests {
         );
 
         assert_eq!(client.balance_of(&addresses.producer), 99_000_000);
-        assert_eq!(client.balance_of(&addresses.platform), 500_000);
+        assert_eq!(client.balance_of(&addresses.admin), 500_000);
         assert_eq!(client.balance_of(&addresses.storage), 500_000);
 
         // Multiple small transfers
@@ -703,7 +695,7 @@ mod comprehensive_tests {
         );
         println!(
             "Platform earned from transfer fee: {}",
-            client.balance_of(&addresses.platform) - 5_000
+            client.balance_of(&addresses.admin) - 5_000
         );
 
         // 5. End buyer burns tokens for physical delivery
@@ -722,7 +714,7 @@ mod comprehensive_tests {
         // - Initial mint: 5k each
         // - Transfer fee: 1.5k to platform
         // - Burn fee: 250 each
-        assert_eq!(client.balance_of(&addresses.platform), 6_750);
+        assert_eq!(client.balance_of(&addresses.admin), 6_750);
         assert_eq!(client.balance_of(&addresses.storage), 5_250);
     }
 }
