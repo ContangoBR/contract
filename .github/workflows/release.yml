@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'  # triggered whenever a new tag (prefixed with "v") is pushed to the repository
 
+permissions:
+  attestations: write
+  contents: write
+  id-token: write
+
 jobs:
   release-contango-contract:
     uses: stellar-expert/soroban-build-workflow/.github/workflows/release.yml@main
