@@ -227,10 +227,7 @@ mod comprehensive_tests {
 
         assert_eq!(client.balance_of(&addresses.producer), 890_000); // 990k - 100k
         assert_eq!(client.balance_of(&addresses.third_party), 99_000); // 100k - 1%
-        assert_eq!(
-            client.balance_of(&addresses.admin),
-            initial_admin + 1_000
-        ); // Fee collected
+        assert_eq!(client.balance_of(&addresses.admin), initial_admin + 1_000); // Fee collected
     }
 
     // Test 9: Burn with fee distribution
@@ -254,10 +251,7 @@ mod comprehensive_tests {
 
         // Verify burn fee distribution (0.5% = 500 tokens)
         assert_eq!(client.balance_of(&addresses.producer), 890_000); // 990k - 100k
-        assert_eq!(
-            client.balance_of(&addresses.admin),
-            initial_admin + 250
-        ); // Half of fee
+        assert_eq!(client.balance_of(&addresses.admin), initial_admin + 250); // Half of fee
         assert_eq!(client.balance_of(&addresses.storage), initial_storage + 250); // Half of fee
         assert_eq!(client.total_supply(), initial_supply - 99_500); // Burned amount minus fees
     }
