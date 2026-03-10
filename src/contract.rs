@@ -1,5 +1,53 @@
 use crate::config::Config;
-use soroban_sdk::{Address, Env, Map, String, Symbol, contract, contractimpl, contracttype};
+use soroban_sdk::{Address, Env, Map, String, contract, contractevent, contractimpl, contracttype};
+
+#[contractevent]
+pub struct MintSpot {
+    #[topic]
+    pub series_id: String,
+    pub amount: i128,
+}
+
+#[contractevent]
+pub struct MintFuture {
+    #[topic]
+    pub series_id: String,
+    pub amount: i128,
+}
+
+#[contractevent]
+pub struct DeliveryConfirmed {
+    #[topic]
+    pub series_id: String,
+    pub amount: i128,
+}
+
+#[contractevent]
+pub struct Burn {
+    #[topic]
+    pub series_id: String,
+    #[topic]
+    pub from: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+pub struct Transfer {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+pub struct Swap {
+    #[topic]
+    pub from_series: String,
+    #[topic]
+    pub to_series: String,
+    pub amount: i128,
+}
 
 #[contracttype]
 #[derive(Clone)]
@@ -129,8 +177,7 @@ impl ContangoToken {
         env.storage().instance().set(&DataKey::State, &state);
 
         // Emit events
-        env.events()
-            .publish((Symbol::new(&env, "mint_spot"), series_id), amount);
+        MintSpot { series_id, amount }.publish(&env);
     }
 
     /// Mint tokens for future contracts (payment received, delivery pending)
@@ -178,8 +225,7 @@ impl ContangoToken {
         state.total_supply += amount;
         env.storage().instance().set(&DataKey::State, &state);
 
-        env.events()
-            .publish((Symbol::new(&env, "mint_future"), series_id), amount);
+        MintFuture { series_id, amount }.publish(&env);
     }
 
     pub fn confirm_delivery(env: Env, series_id: String, storage_validator: Address) {
@@ -215,10 +261,11 @@ impl ContangoToken {
         Self::increase_balance(&env, &buyer, locked_amount);
 
         // Emit delivery confirmation event
-        env.events().publish(
-            (Symbol::new(&env, "delivery_confirmed"), series_id),
-            locked_amount,
-        );
+        DeliveryConfirmed {
+            series_id,
+            amount: locked_amount,
+        }
+        .publish(&env);
     }
 
     /// Burn tokens with fee distribution
@@ -251,8 +298,12 @@ impl ContangoToken {
         env.storage().instance().set(&DataKey::State, &state);
 
         // Emit burn event
-        env.events()
-            .publish((Symbol::new(&env, "burn"), series_id, from), amount);
+        Burn {
+            series_id,
+            from,
+            amount,
+        }
+        .publish(&env);
     }
 
     /// Transfer tokens between addresses (optional fee)
@@ -282,8 +333,12 @@ impl ContangoToken {
             Self::increase_balance(&env, &to, transfer_amount);
         }
 
-        env.events()
-            .publish((Symbol::new(&env, "transfer"), from, to), transfer_amount);
+        Transfer {
+            from,
+            to,
+            amount: transfer_amount,
+        }
+        .publish(&env);
     }
 
     /// Set transfer fee (admin only)
@@ -349,8 +404,12 @@ impl ContangoToken {
         Self::increase_balance(&env, &from, swap_amount);
 
         // Emit swap event
-        env.events()
-            .publish((Symbol::new(&env, "swap"), from_series, to_series), amount);
+        Swap {
+            from_series,
+            to_series,
+            amount,
+        }
+        .publish(&env);
     }
 
     /// Get balance of an address
