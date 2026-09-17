@@ -148,13 +148,10 @@ jobs:
         with:
           toolchain: ${{ env.RUST_VERSION }}
 
-      - name: Cache cargo audit
-        uses: actions/cache@v4
+      - name: Install cargo audit
+        uses: taiki-e/install-action@v2
         with:
-          path: ~/.cargo/bin/cargo-audit
-          key: ${{ runner.os }}-cargo-audit
+          tool: cargo-audit
 
       - name: Run cargo audit
-        run: |
-          command -v cargo-audit || cargo install cargo-audit
-          cargo audit
+        run: cargo audit

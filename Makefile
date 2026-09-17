@@ -1,3 +1,6 @@
+# A Homebrew rust ahead in PATH ignores rust-toolchain.toml and lacks the wasm32v1-none core.
+export PATH := $(HOME)/.cargo/bin:$(PATH)
+
 default: build
 
 all: test
