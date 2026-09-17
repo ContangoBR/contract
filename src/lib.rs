@@ -2,7 +2,6 @@
 
 mod config;
 mod contract;
-mod storage_types;
 
 #[cfg(test)]
 mod test;
