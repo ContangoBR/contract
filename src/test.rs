@@ -249,3 +249,84 @@ fn the_contract_initializes_once() {
         Err(Ok(contract_error(Error::AlreadyInitialized)))
     );
 }
+
+#[test]
+fn an_uninitialized_contract_reports_it() {
+    let env = Env::default();
+    let client = ContangoTokenClient::new(&env, &env.register(ContangoToken, ()));
+
+    assert_eq!(
+        client.try_config(),
+        Err(Ok(contract_error(Error::NotInitialized)))
+    );
+}
+
+#[test]
+fn amounts_must_be_positive() {
+    let p = setup();
+    mint_cen01(&p);
+    let s = series(&p);
+
+    assert_eq!(
+        p.client.try_mint(
+            &String::from_str(&p.env, "CDA-ZERO"),
+            &metadata(&p),
+            &cen01_fees(),
+            &p.admin,
+            &0
+        ),
+        Err(Ok(contract_error(Error::InvalidAmount)))
+    );
+    assert_eq!(
+        p.client
+            .try_transfer(&s, &p.producer, &p.sorriso, &0, &false),
+        Err(Ok(contract_error(Error::InvalidAmount)))
+    );
+    assert_eq!(
+        p.client.try_burn(&s, &p.producer, &-1, &false),
+        Err(Ok(contract_error(Error::InvalidAmount)))
+    );
+}
+
+#[test]
+fn a_series_without_fees_moves_everything_to_the_producer() {
+    let p = setup();
+    p.env.mock_all_auths();
+    let s = series(&p);
+    let no_fees = SeriesFees {
+        mint_platform_bps: 0,
+        mint_storage_bps: 0,
+        transfer_platform_bps: 0,
+        transfer_storage_bps: 0,
+        burn_platform_bps: 0,
+        burn_storage_bps: 0,
+    };
+
+    p.client
+        .mint(&s, &metadata(&p), &no_fees, &p.admin, &tons(10));
+    p.client.burn(&s, &p.producer, &tons(4), &false);
+
+    assert_eq!(p.client.balance(&s, &p.producer), tons(6));
+    assert_eq!(p.client.balance(&s, &p.platform), 0);
+    assert_eq!(p.client.supply(&s), tons(6));
+    assert_eq!(p.client.series(&s), metadata(&p));
+}
+
+#[test]
+fn queries_on_an_unknown_series_fail() {
+    let p = setup();
+    let unknown = String::from_str(&p.env, "CDA-UNKNOWN");
+
+    assert_eq!(
+        p.client.try_supply(&unknown),
+        Err(Ok(contract_error(Error::SeriesNotFound)))
+    );
+    assert_eq!(
+        p.client.try_series(&unknown),
+        Err(Ok(contract_error(Error::SeriesNotFound)))
+    );
+    assert_eq!(
+        p.client.try_fees(&unknown),
+        Err(Ok(contract_error(Error::SeriesNotFound)))
+    );
+}
